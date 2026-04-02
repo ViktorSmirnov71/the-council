@@ -89,14 +89,24 @@ function assignTargets(
 
     switch (phase) {
       case "idle": {
-        // Wander randomly
-        agent.activity = "";
+        // Agents do "tasks" — visit stations, wander, look busy
         agent.idleTimer--;
         if (agent.idleTimer <= 0) {
-          const wp = WANDER_POINTS[Math.floor(Math.random() * WANDER_POINTS.length)];
-          agent.targetX = wp.x + (Math.random() - 0.5) * 60;
-          agent.targetY = wp.y + (Math.random() - 0.5) * 40;
-          agent.idleTimer = 120 + Math.floor(Math.random() * 180);
+          // 40% chance visit a research station, 60% wander
+          if (Math.random() < 0.4) {
+            const station = RESEARCH_STATIONS[Math.floor(Math.random() * RESEARCH_STATIONS.length)];
+            agent.targetX = station.x + (Math.random() - 0.5) * 50;
+            agent.targetY = station.y + 40 + Math.random() * 30;
+            agent.idleTimer = 150 + Math.floor(Math.random() * 200);
+            const idleActivities = ["💻", "📖", "☕", "🔧"];
+            agent.activity = idleActivities[Math.floor(Math.random() * idleActivities.length)];
+          } else {
+            const wp = WANDER_POINTS[Math.floor(Math.random() * WANDER_POINTS.length)];
+            agent.targetX = wp.x + (Math.random() - 0.5) * 80;
+            agent.targetY = wp.y + (Math.random() - 0.5) * 50;
+            agent.idleTimer = 80 + Math.floor(Math.random() * 150);
+            agent.activity = Math.random() < 0.3 ? "💬" : "";
+          }
         }
         break;
       }
@@ -384,43 +394,78 @@ function drawMap(ctx: CanvasRenderingContext2D, frame: number, phase: CouncilPha
     }
   });
 
-  // ─── Meeting table ───
-  // Table shadow
-  ctx.fillStyle = "#00000044";
+  // ─── Meeting table (wooden) ───
+  const tx = TABLE.x;
+  const ty = TABLE.y;
+  const trx = TABLE.rx;
+  const try_ = TABLE.ry;
+
+  // Table legs (drawn first, behind the surface)
+  ctx.fillStyle = "#3d2b1a";
+  ctx.strokeStyle = "#2a1d10";
+  ctx.lineWidth = 1;
+  // Front-left leg
   ctx.beginPath();
-  ctx.ellipse(TABLE.x, TABLE.y + 8, TABLE.rx + 6, TABLE.ry + 6, 0, 0, Math.PI * 2);
+  ctx.roundRect(tx - trx + 20, ty + try_ - 8, 14, 30, [0, 0, 3, 3]);
+  ctx.fill(); ctx.stroke();
+  // Front-right leg
+  ctx.beginPath();
+  ctx.roundRect(tx + trx - 34, ty + try_ - 8, 14, 30, [0, 0, 3, 3]);
+  ctx.fill(); ctx.stroke();
+  // Back-left leg (shorter — perspective)
+  ctx.fillStyle = "#2d1f12";
+  ctx.beginPath();
+  ctx.roundRect(tx - trx + 40, ty - try_ + 5, 10, 16, [0, 0, 2, 2]);
+  ctx.fill(); ctx.stroke();
+  // Back-right leg
+  ctx.beginPath();
+  ctx.roundRect(tx + trx - 50, ty - try_ + 5, 10, 16, [0, 0, 2, 2]);
+  ctx.fill(); ctx.stroke();
+
+  // Table shadow
+  ctx.fillStyle = "#00000033";
+  ctx.beginPath();
+  ctx.ellipse(tx, ty + try_ + 22, trx - 10, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Table edge (side of the wood — gives thickness)
+  ctx.fillStyle = "#3a2616";
+  ctx.beginPath();
+  ctx.ellipse(tx, ty + 6, trx, try_, 0, 0, Math.PI);
   ctx.fill();
 
   // Table surface
-  const grad = ctx.createRadialGradient(TABLE.x, TABLE.y - 10, 20, TABLE.x, TABLE.y, TABLE.rx);
-  grad.addColorStop(0, "#cc4444");
-  grad.addColorStop(1, "#881111");
-  ctx.fillStyle = grad;
+  const woodGrad = ctx.createRadialGradient(tx - 30, ty - 15, 10, tx, ty, trx);
+  woodGrad.addColorStop(0, "#6b4226");
+  woodGrad.addColorStop(0.5, "#5a3520");
+  woodGrad.addColorStop(1, "#4a2a18");
+  ctx.fillStyle = woodGrad;
   ctx.beginPath();
-  ctx.ellipse(TABLE.x, TABLE.y, TABLE.rx, TABLE.ry, 0, 0, Math.PI * 2);
+  ctx.ellipse(tx, ty, trx, try_, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Table rim
-  ctx.strokeStyle = "#660000";
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  // Wood grain lines
+  ctx.strokeStyle = "#5e381e22";
+  ctx.lineWidth = 1;
+  for (let g = -3; g <= 3; g++) {
+    ctx.beginPath();
+    ctx.ellipse(tx + g * 18, ty + g * 3, trx * 0.7, try_ * 0.4, 0.1 * g, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
-  // Emergency button
-  const buttonActive = phase === "round_1" || phase === "round_2" || phase === "voting";
-  const pulse = buttonActive ? Math.sin(frame * 0.1) * 4 : 0;
-  ctx.fillStyle = buttonActive ? "#ff2222" : "#991111";
-  ctx.beginPath();
-  ctx.arc(TABLE.x, TABLE.y, 16 + pulse, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#660000";
+  // Table rim highlight
+  ctx.strokeStyle = "#7a4e30";
   ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(tx, ty, trx, try_, 0, Math.PI + 0.3, Math.PI * 2 - 0.3);
   ctx.stroke();
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 12px 'Courier New', monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("!", TABLE.x, TABLE.y);
-  ctx.textBaseline = "alphabetic";
+
+  // Subtle rim shadow
+  ctx.strokeStyle = "#2a1a0e";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(tx, ty, trx, try_, 0, 0.3, Math.PI - 0.3);
+  ctx.stroke();
 
   // ─── Gallows ───
   const gx = GALLOWS.x;
@@ -660,6 +705,48 @@ export function MeetingRoom({ members, phase, positions, votes, reaper, finalPla
         }
       }
     });
+
+    // Idle overlay — waiting for MCP call
+    if (phase === "idle" && !finalPlan) {
+      // Subtle pulsing overlay
+      const idlePulse = Math.sin(frame * 0.02) * 0.03 + 0.08;
+      ctx.fillStyle = `rgba(10, 10, 30, ${idlePulse})`;
+      ctx.fillRect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
+
+      // Main waiting text
+      const waitPulse = Math.sin(frame * 0.03) * 0.2 + 0.8;
+      ctx.fillStyle = `rgba(100, 100, 180, ${waitPulse})`;
+      ctx.font = "bold 28px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("AWAITING MCP CALL", CANVAS.WIDTH / 2, CANVAS.HEIGHT / 2 - 10);
+
+      // Subtext
+      ctx.fillStyle = "#44446688";
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.fillText('council_plan("...")', CANVAS.WIDTH / 2, CANVAS.HEIGHT / 2 + 18);
+
+      // Animated scanning line
+      const scanY = (frame * 0.8) % CANVAS.HEIGHT;
+      ctx.strokeStyle = "#4444aa15";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, scanY);
+      ctx.lineTo(CANVAS.WIDTH, scanY);
+      ctx.stroke();
+
+      // Connection dots pulsing in corners
+      const dotPositions = [
+        { x: 60, y: 60 }, { x: CANVAS.WIDTH - 60, y: 60 },
+        { x: 60, y: CANVAS.HEIGHT - 60 }, { x: CANVAS.WIDTH - 60, y: CANVAS.HEIGHT - 60 },
+      ];
+      dotPositions.forEach((dp, di) => {
+        const dPulse = Math.sin(frame * 0.05 + di * 1.5) * 0.5 + 0.5;
+        ctx.fillStyle = `rgba(68, 68, 170, ${dPulse * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(dp.x, dp.y, 4 + dPulse * 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
     // Synthesis overlay — document being assembled
     if (phase === "synthesis" || (phase === "idle" && finalPlan)) {
