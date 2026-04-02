@@ -8,6 +8,8 @@
 
 Built for [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | **Track C: Agent Runtime Tools** | **Bounty #08**
 
+![The Council — Isolation Round](docs/screenshots/round1-full.png)
+
 ---
 
 ## The Problem
@@ -73,6 +75,8 @@ The Council prevents this architecturally, not with prompt tricks:
 2. **Defection penalty** — Changing your vote between rounds costs reputation. The Reaper tracks defections. This structurally prevents bandwagoning.
 
 3. **Structured output** — JSON responses, not essays. Votes are counted, not paragraphs. No agent can "out-talk" another.
+
+![Round 1 — Isolated Deliberation](docs/screenshots/round1-isolation.png)
 
 ### The Pipeline
 
@@ -145,6 +149,8 @@ If lowest score < 0.3:
 ```
 
 Bad reasoning patterns get culled. Successful traits propagate. The council adapts to the human's actual preferences through the `council_override` feedback loop.
+
+![Synthesis — Final Plan Assembly](docs/screenshots/synthesis.png)
 
 ### The Sandbox (Among Us Visualization)
 
