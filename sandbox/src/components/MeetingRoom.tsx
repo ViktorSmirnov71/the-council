@@ -839,12 +839,15 @@ export function MeetingRoom({ members, phase, positions, votes, reaper, finalPla
         ctx.fillText("COMPLETE", docX + docW - 8, docY + 16);
       }
 
-      // Document content — show plan text typing in
-      const planText = finalPlan || "Synthesizing council positions...";
+      // Document content — show first ~800 chars in the canvas panel
+      // Full plan is in the sidebar (SpeechPanel) with no truncation
+      const planPreview = finalPlan
+        ? finalPlan.slice(0, 800) + (finalPlan.length > 800 ? "\n\n... full plan in sidebar →" : "")
+        : "Synthesizing council positions...\n\nCompiling member critiques...\nResolving disagreements...\nBuilding phase structure...";
       const visibleChars = phase === "synthesis"
-        ? Math.min(planText.length, Math.floor(synthFrame * 1.5))
-        : planText.length;
-      const visibleText = planText.slice(0, visibleChars);
+        ? Math.min(planPreview.length, Math.floor(synthFrame * 2))
+        : planPreview.length;
+      const visibleText = planPreview.slice(0, visibleChars);
 
       // Parse into lines that fit the document
       ctx.font = "9px 'Courier New', monospace";
@@ -909,7 +912,7 @@ export function MeetingRoom({ members, phase, positions, votes, reaper, finalPla
 
       // Progress bar at bottom of document
       if (phase === "synthesis") {
-        const progress = Math.min(1, visibleChars / Math.max(1, planText.length));
+        const progress = Math.min(1, visibleChars / Math.max(1, planPreview.length));
         ctx.fillStyle = "#1a1a2e";
         ctx.fillRect(docX + 8, docY + docH - 12, docW - 16, 6);
         ctx.fillStyle = "#00ff66";

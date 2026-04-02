@@ -194,12 +194,19 @@ export function SpeechPanel({
         </Section>
       )}
 
-      {/* Final plan */}
+      {/* Final plan — full, no truncation */}
       {finalPlan && (
-        <Section title="FINAL PLAN (v1)">
-          <div style={{ color: "#00ff66", whiteSpace: "pre-wrap" }}>
-            {finalPlan.slice(0, 1000)}
-            {finalPlan.length > 1000 ? "..." : ""}
+        <Section title="APPROVED PLAN — PRD">
+          <div
+            style={{
+              color: "#00ff66",
+              whiteSpace: "pre-wrap",
+              fontSize: 11,
+              lineHeight: 1.6,
+              padding: "8px 0",
+            }}
+          >
+            {finalPlan}
           </div>
         </Section>
       )}
