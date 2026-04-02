@@ -4,3 +4,4 @@ dist/
 .env
 .env.local
 .cursor/mcp.json
+.mcp.json
