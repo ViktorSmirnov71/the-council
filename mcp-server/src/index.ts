@@ -1,4 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import { join } from "node:path";
+
+// Load .env from repo root AND mcp-server/ (either location works)
+dotenv.config({ path: join(import.meta.dirname, "../../.env") });
+dotenv.config({ path: join(import.meta.dirname, "../.env") });
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
