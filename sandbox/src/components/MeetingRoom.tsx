@@ -2,7 +2,16 @@
 
 import { useRef, useEffect, useCallback } from "react";
 import type { CouncilPhase, MemberInfo, MemberPosition, SandboxEvent } from "@/lib/types";
-import { CANVAS, SEAT_POSITIONS } from "@/lib/types";
+import {
+  CANVAS,
+  TABLE,
+  TABLE_SEATS,
+  RESEARCH_STATIONS,
+  ISOLATION_PODS,
+  GALLOWS,
+  SPAWN,
+  WANDER_POINTS,
+} from "@/lib/types";
 
 interface MeetingRoomProps {
   members: MemberInfo[];
@@ -12,87 +21,464 @@ interface MeetingRoomProps {
   reaper: (SandboxEvent & { event: "reaper" }) | null;
 }
 
-// Among Us crewmate proportions (simplified)
+// ─── Agent position tracking (persistent across renders) ───
+
+interface AgentAnim {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  activity: string; // emoji/text shown above head
+  walkPhase: number; // for leg animation
+  idleTimer: number; // frames until next wander
+  reconStation: number; // which station they're visiting (-1 = in transit)
+  facingRight: boolean;
+}
+
+const agentAnims = new Map<string, AgentAnim>();
+let lastPhase: CouncilPhase = "idle";
+let phaseStartFrame = 0;
+
+function getOrCreateAgent(id: string, startX: number, startY: number): AgentAnim {
+  if (!agentAnims.has(id)) {
+    agentAnims.set(id, {
+      x: startX,
+      y: startY,
+      targetX: startX,
+      targetY: startY,
+      activity: "",
+      walkPhase: Math.random() * Math.PI * 2,
+      idleTimer: Math.floor(Math.random() * 120),
+      reconStation: -1,
+      facingRight: true,
+    });
+  }
+  return agentAnims.get(id)!;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function moveAgent(agent: AgentAnim, speed: number = 0.03): boolean {
+  const dx = agent.targetX - agent.x;
+  const dy = agent.targetY - agent.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (dist < 2) return false; // arrived
+
+  agent.x = lerp(agent.x, agent.targetX, speed);
+  agent.y = lerp(agent.y, agent.targetY, speed);
+  agent.walkPhase += 0.15;
+  agent.facingRight = dx > 0;
+  return true; // still moving
+}
+
+// ─── Phase-driven target assignment ───
+
+function assignTargets(
+  members: MemberInfo[],
+  phase: CouncilPhase,
+  frame: number,
+  positions: Map<string, MemberPosition>,
+  reaperEvent: (SandboxEvent & { event: "reaper" }) | null = null,
+) {
+  members.forEach((member, i) => {
+    const agent = getOrCreateAgent(member.id, SPAWN.x + (i - 1.5) * 80, SPAWN.y);
+
+    switch (phase) {
+      case "idle": {
+        // Wander randomly
+        agent.activity = "";
+        agent.idleTimer--;
+        if (agent.idleTimer <= 0) {
+          const wp = WANDER_POINTS[Math.floor(Math.random() * WANDER_POINTS.length)];
+          agent.targetX = wp.x + (Math.random() - 0.5) * 60;
+          agent.targetY = wp.y + (Math.random() - 0.5) * 40;
+          agent.idleTimer = 120 + Math.floor(Math.random() * 180);
+        }
+        break;
+      }
+
+      case "recon": {
+        // Cycle between research stations — each agent visits different ones
+        const cycleTime = 90; // frames per station
+        const stationIdx = Math.floor(((frame - phaseStartFrame) + i * 30) / cycleTime) % RESEARCH_STATIONS.length;
+
+        if (agent.reconStation !== stationIdx) {
+          agent.reconStation = stationIdx;
+          const station = RESEARCH_STATIONS[stationIdx];
+          agent.targetX = station.x + (i - 1.5) * 30;
+          agent.targetY = station.y + 50 + (i % 2) * 25;
+        }
+
+        const station = RESEARCH_STATIONS[stationIdx];
+        agent.activity = station.label === "WEB SEARCH" ? "🔍"
+          : station.label === "DOCS" ? "📄"
+          : station.label === "BENCHMARKS" ? "📊"
+          : "💻";
+        break;
+      }
+
+      case "naive_plan": {
+        // Gather loosely around table, watching
+        const angle = (i / members.length) * Math.PI * 2 - Math.PI / 2;
+        agent.targetX = TABLE.x + Math.cos(angle) * (TABLE.rx + 80);
+        agent.targetY = TABLE.y + Math.sin(angle) * (TABLE.ry + 60);
+        agent.activity = "👀";
+        break;
+      }
+
+      case "round_1": {
+        // Go to isolation pods — separated, can't see each other
+        const pod = ISOLATION_PODS[i] ?? ISOLATION_PODS[0];
+        agent.targetX = pod.x;
+        agent.targetY = pod.y;
+        agent.activity = positions.has(member.name) ? "✍️" : "🤔";
+        break;
+      }
+
+      case "round_2": {
+        // Converge on table seats for debate
+        const seat = TABLE_SEATS[i] ?? TABLE_SEATS[0];
+        agent.targetX = seat.x;
+        agent.targetY = seat.y;
+        agent.activity = "⚔️";
+        break;
+      }
+
+      case "voting": {
+        // At the table, voting
+        const seat = TABLE_SEATS[i] ?? TABLE_SEATS[0];
+        agent.targetX = seat.x;
+        agent.targetY = seat.y;
+        agent.activity = "🗳️";
+        break;
+      }
+
+      case "verdict":
+      case "synthesis": {
+        // At the table, waiting
+        const seat = TABLE_SEATS[i] ?? TABLE_SEATS[0];
+        agent.targetX = seat.x;
+        agent.targetY = seat.y;
+        agent.activity = phase === "verdict" ? "⚖️" : "📝";
+        break;
+      }
+
+      case "reaper": {
+        // Non-eliminated stay at table, eliminated drags to gallows
+        if (member.name === reaperEvent?.eliminated.name) {
+          agent.targetX = GALLOWS.x;
+          agent.targetY = GALLOWS.y;
+          agent.activity = "💀";
+        } else {
+          const seat = TABLE_SEATS[i] ?? TABLE_SEATS[0];
+          agent.targetX = seat.x;
+          agent.targetY = seat.y;
+          agent.activity = "😱";
+        }
+        break;
+      }
+    }
+  });
+}
+
+// ─── Drawing functions ───
+
 function drawCrewmate(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
+  agent: AgentAnim,
   color: string,
   name: string,
-  state: "idle" | "speaking" | "voting" | "dead",
   generation: number,
-  animFrame: number,
+  isDead: boolean,
+  frame: number,
 ) {
   ctx.save();
+  const { x, y } = agent;
 
-  // Idle bob animation
-  const bobY = state === "dead" ? 0 : Math.sin(animFrame * 0.05 + x) * 2;
+  // Walking bob
+  const isMoving = Math.abs(agent.targetX - x) > 2 || Math.abs(agent.targetY - y) > 2;
+  const bobY = isDead ? 0 : isMoving ? Math.sin(agent.walkPhase * 2) * 3 : Math.sin(frame * 0.04 + x * 0.01) * 1.5;
 
-  // Body (Among Us shape: rounded rectangle with visor)
   const bx = x;
   const by = y + bobY;
 
-  if (state === "dead") {
-    ctx.globalAlpha = 0.3;
-  }
+  if (isDead) ctx.globalAlpha = 0.25;
+
+  // Shadow
+  ctx.fillStyle = "#00000033";
+  ctx.beginPath();
+  ctx.ellipse(bx, by + 30, 16, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Flip for direction
+  ctx.translate(bx, by);
+  if (!agent.facingRight) ctx.scale(-1, 1);
 
   // Backpack
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(bx - 28, by - 8, 12, 24, 4);
+  ctx.roundRect(-28, -8, 12, 24, 4);
   ctx.fill();
 
-  // Main body
+  // Body
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(bx - 18, by - 24, 36, 48, [16, 16, 8, 8]);
+  ctx.roundRect(-18, -24, 36, 48, [16, 16, 8, 8]);
   ctx.fill();
 
   // Visor
   ctx.fillStyle = "#a8d8ea";
   ctx.beginPath();
-  ctx.ellipse(bx + 6, by - 8, 14, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(6, -8, 14, 10, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Visor shine
   ctx.fillStyle = "#d4ecf7";
   ctx.beginPath();
-  ctx.ellipse(bx + 4, by - 11, 5, 3, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(4, -11, 5, 3, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legs
+  // Legs with walk animation
   ctx.fillStyle = color;
-  const legOffset = state === "idle" ? Math.sin(animFrame * 0.08) * 2 : 0;
-  // Left leg
+  const legAnim = isMoving ? Math.sin(agent.walkPhase * 2) * 6 : 0;
   ctx.beginPath();
-  ctx.roundRect(bx - 14, by + 22, 12, 12, [0, 0, 4, 4]);
+  ctx.roundRect(-14 + legAnim, 22, 12, 12, [0, 0, 4, 4]);
   ctx.fill();
-  // Right leg
   ctx.beginPath();
-  ctx.roundRect(bx + 2 + legOffset, by + 22, 12, 12, [0, 0, 4, 4]);
+  ctx.roundRect(2 - legAnim, 22, 12, 12, [0, 0, 4, 4]);
   ctx.fill();
 
   // Dead X eyes
-  if (state === "dead") {
+  if (isDead) {
     ctx.strokeStyle = "#ff0000";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(bx + 1, by - 12);
-    ctx.lineTo(bx + 11, by - 4);
-    ctx.moveTo(bx + 11, by - 12);
-    ctx.lineTo(bx + 1, by - 4);
+    ctx.moveTo(1, -12); ctx.lineTo(11, -4);
+    ctx.moveTo(11, -12); ctx.lineTo(1, -4);
     ctx.stroke();
   }
 
-  ctx.globalAlpha = 1;
+  // Reset transform for text (always upright)
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = isDead ? 0.25 : 1;
+
+  // Activity emoji above head
+  if (agent.activity) {
+    ctx.font = "18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(agent.activity, bx, by - 36);
+  }
 
   // Name tag
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 11px 'Courier New', monospace";
+  ctx.fillStyle = isDead ? "#666" : "#ffffff";
+  ctx.font = "bold 10px 'Courier New', monospace";
   ctx.textAlign = "center";
-  ctx.fillText(`${name}-v${generation}`, bx, by + 48);
+  ctx.fillText(`${name}-v${generation}`, bx, by + 46);
 
   ctx.restore();
+}
+
+function drawMap(ctx: CanvasRenderingContext2D, frame: number, phase: CouncilPhase) {
+  // ─── Floor ───
+  ctx.fillStyle = CANVAS.BG_COLOR;
+  ctx.fillRect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
+
+  // Tile grid
+  ctx.strokeStyle = "#161630";
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx < CANVAS.WIDTH; gx += 48) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CANVAS.HEIGHT); ctx.stroke();
+  }
+  for (let gy = 0; gy < CANVAS.HEIGHT; gy += 48) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CANVAS.WIDTH, gy); ctx.stroke();
+  }
+
+  // ─── Walls ───
+  ctx.fillStyle = "#1a1a3a";
+  ctx.fillRect(0, 0, CANVAS.WIDTH, 60); // top wall
+  ctx.fillStyle = "#141428";
+  ctx.fillRect(0, 55, CANVAS.WIDTH, 4); // wall trim
+
+  // ─── Research stations ───
+  RESEARCH_STATIONS.forEach((station, i) => {
+    const active = phase === "recon";
+
+    // Desk
+    ctx.fillStyle = active ? "#2a2a4a" : "#1e1e38";
+    ctx.strokeStyle = active ? "#4444aa" : "#2a2a4a";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(station.x - 40, station.y - 15, 80, 30, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Screen
+    const screenGlow = active ? Math.sin(frame * 0.08 + i) * 0.3 + 0.7 : 0.3;
+    ctx.fillStyle = active
+      ? `rgba(68, 200, 255, ${screenGlow})`
+      : "rgba(40, 40, 80, 0.5)";
+    ctx.beginPath();
+    ctx.roundRect(station.x - 20, station.y - 22, 40, 20, 2);
+    ctx.fill();
+
+    // Screen text (scrolling when active)
+    if (active) {
+      ctx.fillStyle = "#00ff88";
+      ctx.font = "7px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      const scrollOffset = (frame * 0.5) % 30;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(station.x - 18, station.y - 20, 36, 16);
+      ctx.clip();
+      for (let line = 0; line < 4; line++) {
+        const text = ["searching...", "fetching data", "parsing docs", "analyzing..."][(line + Math.floor(frame / 60)) % 4];
+        ctx.fillText(text, station.x, station.y - 16 + line * 6 + (scrollOffset % 6));
+      }
+      ctx.restore();
+    }
+
+    // Label
+    ctx.fillStyle = active ? "#6666cc" : "#333355";
+    ctx.font = "bold 8px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(station.label, station.x, station.y + 28);
+  });
+
+  // ─── Isolation pods (visible during Round 1) ───
+  ISOLATION_PODS.forEach((pod, i) => {
+    const active = phase === "round_1";
+
+    // Pod outline
+    ctx.strokeStyle = active ? "#cc333388" : "#222244";
+    ctx.lineWidth = active ? 2 : 1;
+    ctx.setLineDash(active ? [6, 4] : [3, 6]);
+    ctx.beginPath();
+    ctx.roundRect(pod.x - 55, pod.y - 50, 110, 100, 8);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (active) {
+      // "ISOLATED" label
+      ctx.fillStyle = "#cc333366";
+      ctx.font = "bold 8px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("ISOLATED", pod.x, pod.y - 55);
+
+      // Lock icon
+      ctx.fillText("🔒", pod.x, pod.y + 55);
+    }
+  });
+
+  // ─── Meeting table ───
+  // Table shadow
+  ctx.fillStyle = "#00000044";
+  ctx.beginPath();
+  ctx.ellipse(TABLE.x, TABLE.y + 8, TABLE.rx + 6, TABLE.ry + 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Table surface
+  const grad = ctx.createRadialGradient(TABLE.x, TABLE.y - 10, 20, TABLE.x, TABLE.y, TABLE.rx);
+  grad.addColorStop(0, "#cc4444");
+  grad.addColorStop(1, "#881111");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(TABLE.x, TABLE.y, TABLE.rx, TABLE.ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Table rim
+  ctx.strokeStyle = "#660000";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Emergency button
+  const buttonActive = phase === "round_1" || phase === "round_2" || phase === "voting";
+  const pulse = buttonActive ? Math.sin(frame * 0.1) * 4 : 0;
+  ctx.fillStyle = buttonActive ? "#ff2222" : "#991111";
+  ctx.beginPath();
+  ctx.arc(TABLE.x, TABLE.y, 16 + pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#660000";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 12px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("!", TABLE.x, TABLE.y);
+  ctx.textBaseline = "alphabetic";
+
+  // ─── Gallows ───
+  const gx = GALLOWS.x;
+  const gy = GALLOWS.y;
+  const gallowsActive = phase === "reaper";
+
+  // Platform
+  ctx.fillStyle = gallowsActive ? "#3a2a1a" : "#1e1a14";
+  ctx.fillRect(gx - 50, gy + 10, 100, 8);
+
+  // Vertical post
+  ctx.fillStyle = gallowsActive ? "#4a3a2a" : "#2a2420";
+  ctx.fillRect(gx - 35, gy - 60, 8, 70);
+
+  // Horizontal beam
+  ctx.fillRect(gx - 35, gy - 64, 60, 6);
+
+  // Support brace
+  ctx.strokeStyle = gallowsActive ? "#4a3a2a" : "#2a2420";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(gx - 27, gy - 40);
+  ctx.lineTo(gx - 5, gy - 58);
+  ctx.stroke();
+
+  // Rope
+  ctx.strokeStyle = gallowsActive ? "#aa8844" : "#554422";
+  ctx.lineWidth = 2;
+  const ropeSwing = gallowsActive ? Math.sin(frame * 0.05) * 3 : 0;
+  ctx.beginPath();
+  ctx.moveTo(gx + 15, gy - 58);
+  ctx.lineTo(gx + 15 + ropeSwing, gy - 35);
+  ctx.stroke();
+
+  // Noose
+  ctx.beginPath();
+  ctx.arc(gx + 15 + ropeSwing, gy - 30, 6, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Label
+  ctx.fillStyle = gallowsActive ? "#ff4444" : "#333";
+  ctx.font = "bold 9px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("THE GALLOWS", gx, gy + 30);
+
+  // ─── Data conduits (decorative lines connecting stations) ───
+  if (phase === "recon") {
+    ctx.strokeStyle = "#4444aa22";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 8]);
+    for (let si = 0; si < RESEARCH_STATIONS.length - 1; si++) {
+      const s1 = RESEARCH_STATIONS[si];
+      const s2 = RESEARCH_STATIONS[si + 1];
+      ctx.beginPath();
+      ctx.moveTo(s1.x, s1.y + 15);
+      ctx.lineTo(s2.x, s2.y + 15);
+      ctx.stroke();
+
+      // Traveling dot
+      const progress = ((frame * 2 + si * 40) % 200) / 200;
+      const dotX = lerp(s1.x, s2.x, progress);
+      const dotY = lerp(s1.y + 15, s2.y + 15, progress);
+      ctx.fillStyle = "#44aaff";
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.setLineDash([]);
+  }
 }
 
 function drawSpeechBubble(
@@ -102,50 +488,14 @@ function drawSpeechBubble(
   text: string,
   color: string,
 ) {
-  const maxWidth = 180;
-  ctx.font = "10px 'Courier New', monospace";
-  const lines = wrapText(ctx, text, maxWidth - 16);
-  const lineHeight = 13;
-  const bubbleH = lines.length * lineHeight + 12;
-  const bubbleW = maxWidth;
-  const bx = x - bubbleW / 2;
-  const by = y - bubbleH - 30;
-
-  // Bubble background
-  ctx.fillStyle = "#1a1a2eee";
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(bx, by, bubbleW, bubbleH, 8);
-  ctx.fill();
-  ctx.stroke();
-
-  // Tail
-  ctx.beginPath();
-  ctx.moveTo(x - 6, by + bubbleH);
-  ctx.lineTo(x, by + bubbleH + 8);
-  ctx.lineTo(x + 6, by + bubbleH);
-  ctx.fillStyle = "#1a1a2eee";
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.stroke();
-
-  // Text
-  ctx.fillStyle = "#cccccc";
-  ctx.textAlign = "left";
-  lines.forEach((line, i) => {
-    ctx.fillText(line, bx + 8, by + 14 + i * lineHeight);
-  });
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const maxWidth = 170;
+  ctx.font = "9px 'Courier New', monospace";
   const words = text.split(" ");
   const lines: string[] = [];
   let current = "";
-
   for (const word of words) {
     const test = current ? `${current} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && current) {
+    if (ctx.measureText(test).width > maxWidth - 14 && current) {
       lines.push(current);
       current = word;
     } else {
@@ -153,82 +503,80 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
     }
   }
   if (current) lines.push(current);
-  return lines.slice(0, 4); // Max 4 lines in a bubble
-}
+  const visibleLines = lines.slice(0, 3);
 
-function drawTable(ctx: CanvasRenderingContext2D, animFrame: number) {
-  const { TABLE_X, TABLE_Y, TABLE_RX, TABLE_RY } = CANVAS;
+  const lineHeight = 12;
+  const bubbleH = visibleLines.length * lineHeight + 10;
+  const bubbleW = maxWidth;
+  const bx = Math.max(5, Math.min(x - bubbleW / 2, CANVAS.WIDTH - bubbleW - 5));
+  const by = y - bubbleH - 48;
 
-  // Table shadow
-  ctx.fillStyle = "#00000044";
+  ctx.fillStyle = "#0f0f23ee";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.ellipse(TABLE_X, TABLE_Y + 8, TABLE_RX + 4, TABLE_RY + 4, 0, 0, Math.PI * 2);
+  ctx.roundRect(bx, by, bubbleW, bubbleH, 6);
   ctx.fill();
-
-  // Table surface
-  const grad = ctx.createRadialGradient(TABLE_X, TABLE_Y, 20, TABLE_X, TABLE_Y, TABLE_RX);
-  grad.addColorStop(0, "#cc4444");
-  grad.addColorStop(1, "#881111");
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.ellipse(TABLE_X, TABLE_Y, TABLE_RX, TABLE_RY, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Table border
-  ctx.strokeStyle = "#661111";
-  ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Emergency button in center
-  const pulse = Math.sin(animFrame * 0.06) * 3;
-  ctx.fillStyle = "#ff2222";
+  // Tail
   ctx.beginPath();
-  ctx.arc(TABLE_X, TABLE_Y, 18 + pulse, 0, Math.PI * 2);
+  ctx.moveTo(x - 5, by + bubbleH);
+  ctx.lineTo(x, by + bubbleH + 7);
+  ctx.lineTo(x + 5, by + bubbleH);
+  ctx.fillStyle = "#0f0f23ee";
   ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 10px 'Courier New', monospace";
+
+  ctx.fillStyle = "#bbbbbb";
+  ctx.textAlign = "left";
+  visibleLines.forEach((line, i) => {
+    ctx.fillText(line, bx + 7, by + 12 + i * lineHeight);
+  });
+}
+
+function drawPhaseTitle(ctx: CanvasRenderingContext2D, phase: CouncilPhase, frame: number) {
+  if (phase === "idle") return;
+
+  const labels: Record<CouncilPhase, string> = {
+    idle: "",
+    recon: "RECON — GATHERING INTEL",
+    naive_plan: "GENERATING BASELINE PLAN...",
+    round_1: "EMERGENCY MEETING — ISOLATION ROUND",
+    round_2: "CHALLENGE ROUND — REBUTTALS",
+    voting: "FINAL VOTES",
+    verdict: "VERDICT REACHED",
+    synthesis: "SYNTHESIZING FINAL PLAN...",
+    reaper: "REAPER ACTIVATED",
+  };
+
+  const label = labels[phase];
+  const isReaper = phase === "reaper";
+
+  // Background bar
+  ctx.fillStyle = isReaper ? "#33000088" : "#00000066";
+  ctx.fillRect(0, 62, CANVAS.WIDTH, 28);
+
+  // Text
+  ctx.fillStyle = isReaper ? "#ff3333" : "#ffffff";
+  ctx.font = "bold 14px 'Courier New', monospace";
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("!", TABLE_X, TABLE_Y);
+  ctx.fillText(label, CANVAS.WIDTH / 2, 81);
+
+  // Animated progress dots
+  if (phase === "recon" || phase === "naive_plan" || phase === "synthesis") {
+    const dots = ".".repeat((Math.floor(frame / 20) % 4));
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "left";
+    const textW = ctx.measureText(label).width;
+    ctx.fillText(dots, CANVAS.WIDTH / 2 + textW / 2 + 2, 81);
+  }
 }
 
-function drawGallowsOutline(ctx: CanvasRenderingContext2D) {
-  const gx = CANVAS.GALLOWS_X;
-  const gy = CANVAS.GALLOWS_Y;
-
-  ctx.strokeStyle = "#444444";
-  ctx.lineWidth = 3;
-
-  // Base
-  ctx.beginPath();
-  ctx.moveTo(gx - 30, gy);
-  ctx.lineTo(gx + 30, gy);
-  ctx.stroke();
-
-  // Vertical
-  ctx.beginPath();
-  ctx.moveTo(gx - 10, gy);
-  ctx.lineTo(gx - 10, gy - 60);
-  ctx.stroke();
-
-  // Horizontal beam
-  ctx.beginPath();
-  ctx.moveTo(gx - 10, gy - 60);
-  ctx.lineTo(gx + 20, gy - 60);
-  ctx.stroke();
-
-  // Rope
-  ctx.strokeStyle = "#886644";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(gx + 20, gy - 60);
-  ctx.lineTo(gx + 20, gy - 45);
-  ctx.stroke();
-}
+// ─── Main component ───
 
 export function MeetingRoom({ members, phase, positions, votes, reaper }: MeetingRoomProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animFrameRef = useRef(0);
+  const frameRef = useRef(0);
   const rafRef = useRef<number>(0);
 
   const render = useCallback(() => {
@@ -237,127 +585,102 @@ export function MeetingRoom({ members, phase, positions, votes, reaper }: Meetin
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    animFrameRef.current++;
-    const frame = animFrameRef.current;
+    frameRef.current++;
+    const frame = frameRef.current;
 
-    // Clear
-    ctx.fillStyle = CANVAS.BG_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Floor pattern (subtle grid)
-    ctx.strokeStyle = "#1f1f3a";
-    ctx.lineWidth = 0.5;
-    for (let x = 0; x < canvas.width; x += 40) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
+    // Detect phase change
+    if (phase !== lastPhase) {
+      lastPhase = phase;
+      phaseStartFrame = frame;
     }
 
-    // Draw table
-    drawTable(ctx, frame);
+    // Assign movement targets based on phase
+    assignTargets(members, phase, frame, positions, reaper);
 
-    // Draw gallows outline
-    drawGallowsOutline(ctx);
+    // Move all agents toward their targets
+    members.forEach((member) => {
+      const agent = agentAnims.get(member.id);
+      if (agent) {
+        const speed = phase === "recon" ? 0.04 : phase === "reaper" ? 0.015 : 0.035;
+        moveAgent(agent, speed);
+      }
+    });
 
-    // Draw crewmates at their seats
-    members.forEach((member, i) => {
-      const seat = SEAT_POSITIONS[i] ?? { x: 300 + i * 100, y: 300 };
-      const hasPosition = positions.has(member.name);
-      const hasVoted = votes.some((v) => v.member === member.name);
-      const isReaped = reaper?.eliminated.name === member.name;
+    // ─── Draw ───
+    drawMap(ctx, frame, phase);
+    drawPhaseTitle(ctx, phase, frame);
 
-      let crewState: "idle" | "speaking" | "voting" | "dead" = "idle";
-      if (isReaped) crewState = "dead";
-      else if (hasVoted) crewState = "voting";
-      else if (hasPosition) crewState = "speaking";
+    // Draw crewmates (sorted by Y for depth)
+    const sortedMembers = [...members].sort((a, b) => {
+      const aa = agentAnims.get(a.id);
+      const ab = agentAnims.get(b.id);
+      return (aa?.y ?? 0) - (ab?.y ?? 0);
+    });
 
-      drawCrewmate(ctx, seat.x, seat.y, member.color, member.name, crewState, member.generation, frame);
+    sortedMembers.forEach((member, _i) => {
+      const agent = agentAnims.get(member.id);
+      if (!agent) return;
 
-      // Speech bubble for Round 1 positions
-      if (hasPosition && (phase === "round_1" || phase === "round_2")) {
+      const isEliminated = phase === "reaper" && reaper?.eliminated.name === member.name;
+      drawCrewmate(ctx, agent, member.color, member.name, member.generation, isEliminated, frame);
+
+      // Speech bubbles during round 1 and round 2
+      if (positions.has(member.name) && (phase === "round_1" || phase === "round_2")) {
         const pos = positions.get(member.name)!;
-        const bubbleText = pos.critique.slice(0, 120) + (pos.critique.length > 120 ? "..." : "");
-        drawSpeechBubble(ctx, seat.x, seat.y - 24, bubbleText, member.color);
+        const text = pos.critique.slice(0, 100) + (pos.critique.length > 100 ? "..." : "");
+        drawSpeechBubble(ctx, agent.x, agent.y, text, member.color);
       }
 
-      // Vote indicator
-      if (hasVoted && phase === "voting") {
-        const vote = votes.find((v) => v.member === member.name)!;
-        ctx.fillStyle = vote.defected ? "#ff6600" : "#00ff66";
-        ctx.font = "bold 12px 'Courier New', monospace";
+      // Vote labels during voting
+      const memberVote = votes.find((v) => v.member === member.name);
+      if (memberVote && (phase === "voting" || phase === "verdict")) {
+        ctx.fillStyle = memberVote.defected ? "#ff6600" : "#00ff66";
+        ctx.font = "bold 10px 'Courier New', monospace";
         ctx.textAlign = "center";
         ctx.fillText(
-          `${vote.option} (${(vote.confidence * 100).toFixed(0)}%)`,
-          seat.x,
-          seat.y + 60,
+          `${memberVote.option.slice(0, 20)} (${(memberVote.confidence * 100).toFixed(0)}%)`,
+          agent.x,
+          agent.y + 56,
         );
-        if (vote.defected) {
+        if (memberVote.defected) {
           ctx.fillStyle = "#ff6600";
-          ctx.fillText("⚠ DEFECTED", seat.x, seat.y + 74);
+          ctx.font = "bold 9px 'Courier New', monospace";
+          ctx.fillText("⚠ DEFECTED", agent.x, agent.y + 68);
         }
       }
     });
 
-    // Phase title
-    if (phase !== "idle") {
-      const phaseLabels: Record<CouncilPhase, string> = {
-        idle: "",
-        recon: "RECON PHASE",
-        naive_plan: "GENERATING BASELINE PLAN...",
-        round_1: "⚡ EMERGENCY MEETING — ROUND 1",
-        round_2: "ROUND 2 — CHALLENGES",
-        voting: "FINAL VOTES",
-        verdict: "VERDICT",
-        synthesis: "SYNTHESIZING PLAN...",
-        reaper: "💀 REAPER ACTIVATED",
-      };
-
-      const label = phaseLabels[phase];
-      ctx.fillStyle = phase === "reaper" ? "#ff0000" : "#ffffff";
-      ctx.font = "bold 20px 'Courier New', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(label, canvas.width / 2, 40);
-
-      // Animated underline
-      const textW = ctx.measureText(label).width;
-      const lineProgress = Math.min(1, (frame % 60) / 30);
-      ctx.strokeStyle = phase === "reaper" ? "#ff0000" : "#cc3333";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - textW / 2, 46);
-      ctx.lineTo(canvas.width / 2 - textW / 2 + textW * lineProgress, 46);
-      ctx.stroke();
-    }
-
-    // Reaper animation overlay
+    // Reaper overlay
     if (phase === "reaper" && reaper) {
-      const flash = Math.sin(frame * 0.15) > 0;
-      if (flash) {
-        ctx.fillStyle = "#ff000015";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      ctx.fillStyle = "#ff0000";
-      ctx.font = "bold 16px 'Courier New', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(
-        `${reaper.eliminated.name}-v${reaper.eliminated.generation} WAS ELIMINATED`,
-        canvas.width / 2,
-        canvas.height - 30,
+      // Red vignette
+      const vignetteGrad = ctx.createRadialGradient(
+        CANVAS.WIDTH / 2, CANVAS.HEIGHT / 2, 200,
+        CANVAS.WIDTH / 2, CANVAS.HEIGHT / 2, CANVAS.WIDTH / 2,
       );
-      ctx.fillStyle = "#888888";
+      vignetteGrad.addColorStop(0, "transparent");
+      vignetteGrad.addColorStop(1, "rgba(80, 0, 0, 0.4)");
+      ctx.fillStyle = vignetteGrad;
+      ctx.fillRect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
+
+      // Elimination text
+      const flash = Math.sin(frame * 0.12) > 0;
+      if (flash) {
+        ctx.fillStyle = "#ff0000cc";
+        ctx.font = "bold 22px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          `${reaper.eliminated.name}-v${reaper.eliminated.generation} WAS ELIMINATED`,
+          CANVAS.WIDTH / 2,
+          CANVAS.HEIGHT - 50,
+        );
+      }
+      ctx.fillStyle = "#888";
       ctx.font = "12px 'Courier New', monospace";
+      ctx.textAlign = "center";
       ctx.fillText(
         `Win rate: ${(reaper.eliminated.winRate * 100).toFixed(0)}%`,
-        canvas.width / 2,
-        canvas.height - 12,
+        CANVAS.WIDTH / 2,
+        CANVAS.HEIGHT - 28,
       );
     }
 

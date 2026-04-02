@@ -4,7 +4,6 @@ import { useCouncilSocket } from "@/hooks/useCouncilSocket";
 import { MeetingRoom } from "@/components/MeetingRoom";
 import { SpeechPanel } from "@/components/SpeechPanel";
 import { VotePanel } from "@/components/VotePanel";
-import { Gallows } from "@/components/Gallows";
 import { Leaderboard } from "@/components/Leaderboard";
 import { PhaseBar } from "@/components/PhaseBar";
 
@@ -22,7 +21,7 @@ export default function Home() {
 
       {/* Main area */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* Left column: Meeting room canvas */}
+        {/* Left: Meeting room canvas (map + agents) */}
         <div style={{ flex: 2, position: "relative" }}>
           <MeetingRoom
             members={council.members}
@@ -33,14 +32,15 @@ export default function Home() {
           />
         </div>
 
-        {/* Right column: Speech + Vote panels */}
+        {/* Right: Speech + Vote + Leaderboard */}
         <div
           style={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            borderLeft: "2px solid #333",
+            borderLeft: "2px solid #222",
             maxWidth: 420,
+            background: "#0a0a18",
           }}
         >
           <SpeechPanel
@@ -54,20 +54,10 @@ export default function Home() {
             finalPlan={council.finalPlan}
           />
           <VotePanel votes={council.votes} verdict={council.verdict} />
+          <div style={{ borderTop: "1px solid #222", minHeight: 120 }}>
+            <Leaderboard members={council.members} />
+          </div>
         </div>
-      </div>
-
-      {/* Bottom bar: Gallows + Leaderboard */}
-      <div
-        style={{
-          height: 160,
-          display: "flex",
-          borderTop: "2px solid #333",
-          background: "#0d0d1a",
-        }}
-      >
-        <Gallows reaper={council.reaper} />
-        <Leaderboard members={council.members} />
       </div>
     </div>
   );

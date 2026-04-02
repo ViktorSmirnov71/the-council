@@ -101,22 +101,47 @@ export type SandboxEvent =
 export const CANVAS = {
   WIDTH: 1200,
   HEIGHT: 800,
-  BG_COLOR: "#1a1a2e",
-  TABLE_COLOR: "#cc3333",
-  TABLE_X: 600,
-  TABLE_Y: 350,
-  TABLE_RX: 200,
-  TABLE_RY: 100,
-  GALLOWS_X: 150,
-  GALLOWS_Y: 650,
-  LEADERBOARD_X: 950,
-  LEADERBOARD_Y: 500,
+  BG_COLOR: "#0f0f23",
 } as const;
 
-// Seat positions around the oval table
-export const SEAT_POSITIONS: Array<{ x: number; y: number }> = [
-  { x: 400, y: 260 }, // top-left
-  { x: 800, y: 260 }, // top-right
-  { x: 400, y: 440 }, // bottom-left
-  { x: 800, y: 440 }, // bottom-right
+// ─── Map Zones ───
+
+// Meeting table (center of the map)
+export const TABLE = { x: 600, y: 400, rx: 160, ry: 80 };
+
+// Seats around the table (where agents sit during debates)
+export const TABLE_SEATS: Array<{ x: number; y: number }> = [
+  { x: 440, y: 340 },
+  { x: 760, y: 340 },
+  { x: 440, y: 460 },
+  { x: 760, y: 460 },
+];
+
+// Research stations (where agents go during recon) — 4 desks with computers
+export const RESEARCH_STATIONS: Array<{ x: number; y: number; label: string }> = [
+  { x: 120, y: 140, label: "WEB SEARCH" },
+  { x: 350, y: 120, label: "DOCS" },
+  { x: 850, y: 120, label: "BENCHMARKS" },
+  { x: 1060, y: 140, label: "GITHUB" },
+];
+
+// Isolation pods (where agents go during Round 1 — can't see each other)
+export const ISOLATION_PODS: Array<{ x: number; y: number }> = [
+  { x: 140, y: 400 },
+  { x: 1060, y: 400 },
+  { x: 140, y: 620 },
+  { x: 1060, y: 620 },
+];
+
+// Gallows area
+export const GALLOWS = { x: 600, y: 700 };
+
+// Spawn point (where new agents materialize)
+export const SPAWN = { x: 600, y: 100 };
+
+// Wandering waypoints (random positions agents visit when idle)
+export const WANDER_POINTS: Array<{ x: number; y: number }> = [
+  { x: 200, y: 300 }, { x: 400, y: 200 }, { x: 800, y: 200 },
+  { x: 1000, y: 300 }, { x: 300, y: 550 }, { x: 900, y: 550 },
+  { x: 500, y: 650 }, { x: 700, y: 650 }, { x: 600, y: 250 },
 ];
