@@ -1,7 +1,24 @@
+#!/usr/bin/env node
+
+// CRITICAL: MCP uses stdout for JSON-RPC. Any stray stdout output kills the protocol.
+// Some Node/shell hooks print to stdout on startup (e.g. "◇ injecting env").
+// Intercept and redirect ALL stdout writes to stderr until MCP transport takes over.
+const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = function (chunk: any, ...args: any[]) {
+  // Only allow JSON-RPC messages (start with '{')
+  if (typeof chunk === "string" && !chunk.startsWith("{")) {
+    return process.stderr.write(chunk, ...args);
+  }
+  if (Buffer.isBuffer(chunk) && chunk[0] !== 0x7b) {
+    return process.stderr.write(chunk, ...args);
+  }
+  return _origStdoutWrite(chunk, ...args);
+} as typeof process.stdout.write;
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Load .env silently (no stdout output — MCP uses stdout for JSON-RPC)
+// Load .env silently
 function loadEnvSilent(path: string) {
   try {
     const content = readFileSync(path, "utf-8");
@@ -24,8 +41,8 @@ import { deliberate } from "./council.js";
 
 const state = new CouncilState();
 
-// Start unified HTTP + WebSocket server (serves sandbox UI + real-time events)
-state.startServer(3099);
+// Start unified HTTP + WebSocket server (finds open port automatically)
+await state.startServer(3099);
 
 const server = new McpServer({
   name: "the-council",

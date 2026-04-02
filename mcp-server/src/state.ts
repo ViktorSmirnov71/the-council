@@ -19,6 +19,19 @@ const MIME_TYPES: Record<string, string> = {
   ".woff": "font/woff",
 };
 
+function findOpenPort(startPort: number): Promise<number> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.on("error", () => {
+      // Port in use, try next
+      resolve(findOpenPort(startPort + 1));
+    });
+    server.listen(startPort, () => {
+      server.close(() => resolve(startPort));
+    });
+  });
+}
+
 export class CouncilState {
   phase: CouncilPhase = "idle";
   members: MemberState[] = createDefaultMembers();
@@ -34,10 +47,21 @@ export class CouncilState {
    * Start a single HTTP server that:
    * 1. Serves the static sandbox UI (from sandbox/out/)
    * 2. Handles WebSocket upgrades for real-time events
+   * 3. Finds an open port automatically if preferred port is taken
    */
-  startServer(port: number = 3099): void {
+  async startServer(preferredPort: number = 3099): Promise<void> {
+    // Find an open port
+    const port = await findOpenPort(preferredPort);
+    if (port !== preferredPort) {
+      console.error(`[council] Port ${preferredPort} in use, using ${port}`);
+    }
+
     // Resolve the static sandbox build directory
-    const sandboxDir = join(import.meta.dirname, "../../sandbox/out");
+    const candidates = [
+      join(import.meta.dirname, "../sandbox-ui"),
+      join(import.meta.dirname, "../../sandbox/out"),
+    ];
+    const sandboxDir = candidates.find((d) => existsSync(join(d, "index.html"))) ?? candidates[0];
     const hasSandbox = existsSync(join(sandboxDir, "index.html"));
 
     // Create HTTP server for static files
@@ -53,12 +77,10 @@ export class CouncilState {
 
       let filePath = join(sandboxDir, req.url === "/" ? "index.html" : req.url!);
 
-      // If path doesn't have extension and doesn't exist, try .html
       if (!extname(filePath) && !existsSync(filePath)) {
         filePath += ".html";
       }
 
-      // If still doesn't exist, fall back to index.html (SPA routing)
       if (!existsSync(filePath)) {
         filePath = join(sandboxDir, "index.html");
       }
@@ -75,14 +97,13 @@ export class CouncilState {
       }
     });
 
-    // Attach WebSocket server to the same HTTP server
+    // Attach WebSocket server to the HTTP server
     this.wss = new WebSocketServer({ server: httpServer });
 
     this.wss.on("connection", (ws) => {
       this.clients.add(ws);
       console.error(`[council] Sandbox client connected (${this.clients.size} total)`);
 
-      // Send current state on connect
       ws.send(
         JSON.stringify({
           event: "state_sync",
@@ -107,30 +128,13 @@ export class CouncilState {
       });
     });
 
-    httpServer.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        console.error(`[council] Port ${port} in use, trying ${port + 1}...`);
-        httpServer.listen(port + 1, () => {
-          this.sandboxUrl = `http://localhost:${port + 1}`;
-          console.error(`[council] Server running at ${this.sandboxUrl}`);
-        });
-      } else {
-        console.error(`[council] Server error: ${err.message}`);
-      }
-    });
-
+    // Now listen — port is guaranteed free
     httpServer.listen(port, () => {
       this.sandboxUrl = `http://localhost:${port}`;
       console.error(`[council] Server running at ${this.sandboxUrl}`);
-      console.error(`[council] Sandbox UI: ${this.sandboxUrl}`);
-      console.error(`[council] WebSocket: ws://localhost:${port}`);
     });
   }
 
-  /**
-   * Auto-open the sandbox in the default browser.
-   * Only opens once per server lifetime.
-   */
   openBrowser(): void {
     if (this.browserOpened || !this.sandboxUrl) return;
     this.browserOpened = true;
@@ -145,7 +149,6 @@ export class CouncilState {
     exec(cmd, (err) => {
       if (err) {
         console.error(`[council] Could not open browser: ${err.message}`);
-        console.error(`[council] Open manually: ${this.sandboxUrl}`);
       } else {
         console.error(`[council] Opened sandbox in browser`);
       }

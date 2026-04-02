@@ -388,7 +388,7 @@ async function runMockDeliberation(state: CouncilState) {
 // ─── Main ───
 async function main() {
   const state = new CouncilState();
-  state.startServer(3099);
+  await state.startServer(3099);
 
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("  THE COUNCIL — Test Harness");
