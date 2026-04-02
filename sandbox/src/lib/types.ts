@@ -70,6 +70,7 @@ export type SandboxEvent =
   | { event: "state_sync"; phase: CouncilPhase; members: MemberInfo[]; historyCount: number }
   | { event: "meeting_called"; decision: string; timestamp: number }
   | { event: "recon_start"; searches: string[] }
+  | { event: "recon_result"; query: string; source: string; icon: string; snippet: string; meta?: string }
   | { event: "recon_complete"; brief: string }
   | { event: "naive_plan"; plan: string }
   | { event: "round_1_start"; members: string[] }

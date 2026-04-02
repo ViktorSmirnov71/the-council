@@ -2,6 +2,14 @@
 
 import type { CouncilPhase, MemberPosition } from "@/lib/types";
 
+interface ReconResult {
+  query: string;
+  source: string;
+  icon: string;
+  snippet: string;
+  meta?: string;
+}
+
 interface SpeechPanelProps {
   phase: CouncilPhase;
   decision: string;
@@ -9,6 +17,7 @@ interface SpeechPanelProps {
   positions: Map<string, MemberPosition>;
   rebuttals: Array<{ from: string; to: string; text: string }>;
   searchQueries: string[];
+  reconResults: ReconResult[];
   contextBrief: string;
   finalPlan: string;
 }
@@ -20,6 +29,16 @@ const MEMBER_COLORS: Record<string, string> = {
   BISHOP: "#FFD700",
 };
 
+const SOURCE_COLORS: Record<string, string> = {
+  github: "#f0883e",
+  npm: "#cb3837",
+  web: "#4285f4",
+  docs: "#00bcd4",
+  benchmark: "#8bc34a",
+  stackoverflow: "#f48024",
+  arxiv: "#b31b1b",
+};
+
 export function SpeechPanel({
   phase,
   decision,
@@ -27,6 +46,7 @@ export function SpeechPanel({
   positions,
   rebuttals,
   searchQueries,
+  reconResults,
   contextBrief,
   finalPlan,
 }: SpeechPanelProps) {
@@ -41,18 +61,70 @@ export function SpeechPanel({
         lineHeight: 1.5,
       }}
     >
-      {/* Recon */}
-      {searchQueries.length > 0 && (
-        <Section title="RECON">
-          {searchQueries.map((q, i) => (
-            <div key={i} style={{ color: "#888", marginBottom: 4 }}>
-              🔍 {q}
+      {/* Recon — live feed */}
+      {(searchQueries.length > 0 || reconResults.length > 0) && (
+        <Section title="RECON — GATHERING INTEL">
+          {/* Active search queries */}
+          {phase === "recon" && searchQueries.map((q, i) => {
+            const isActive = reconResults.filter((r) => r.query === q).length === 0;
+            return (
+              <div
+                key={`q-${i}`}
+                style={{
+                  color: isActive ? "#4488ff" : "#444",
+                  marginBottom: 4,
+                  fontSize: 10,
+                }}
+              >
+                {isActive ? "⟳" : "✓"} {q}
+              </div>
+            );
+          })}
+
+          {/* Results feed */}
+          {reconResults.map((r, i) => (
+            <div
+              key={`r-${i}`}
+              style={{
+                marginBottom: 8,
+                padding: "6px 8px",
+                background: "#0d0d20",
+                borderRadius: 4,
+                borderLeft: `3px solid ${SOURCE_COLORS[r.source] ?? "#555"}`,
+                animation: "fadeSlideIn 0.3s ease",
+              }}
+            >
+              {/* Source header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: 13 }}>{r.icon}</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: "bold",
+                    color: SOURCE_COLORS[r.source] ?? "#888",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {r.source}
+                </span>
+                {r.meta && (
+                  <span style={{ fontSize: 9, color: "#555", marginLeft: "auto" }}>
+                    {r.meta}
+                  </span>
+                )}
+              </div>
+              {/* Snippet */}
+              <div style={{ color: "#bbb", fontSize: 11, lineHeight: 1.4 }}>
+                {r.snippet}
+              </div>
             </div>
           ))}
-          {contextBrief && (
-            <div style={{ color: "#aaa", marginTop: 8, whiteSpace: "pre-wrap" }}>
-              {contextBrief.slice(0, 500)}
-              {contextBrief.length > 500 ? "..." : ""}
+
+          {/* Context brief summary */}
+          {contextBrief && phase !== "recon" && (
+            <div style={{ color: "#666", marginTop: 6, fontSize: 10, fontStyle: "italic" }}>
+              {reconResults.length} sources gathered — context compiled
             </div>
           )}
         </Section>

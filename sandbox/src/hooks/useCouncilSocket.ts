@@ -16,6 +16,7 @@ export interface CouncilSocketState {
   finalPlan: string;
   reaper: SandboxEvent & { event: "reaper" } | null;
   searchQueries: string[];
+  reconResults: Array<{ query: string; source: string; icon: string; snippet: string; meta?: string }>;
   contextBrief: string;
 }
 
@@ -32,6 +33,7 @@ const INITIAL_STATE: CouncilSocketState = {
   finalPlan: "",
   reaper: null,
   searchQueries: [],
+  reconResults: [],
   contextBrief: "",
 };
 
@@ -92,7 +94,19 @@ export function useCouncilSocket(url?: string) {
             };
 
           case "recon_start":
-            return { ...prev, searchQueries: event.searches };
+            return { ...prev, searchQueries: event.searches, reconResults: [] };
+
+          case "recon_result":
+            return {
+              ...prev,
+              reconResults: [...prev.reconResults, {
+                query: event.query,
+                source: event.source,
+                icon: event.icon,
+                snippet: event.snippet,
+                meta: event.meta,
+              }],
+            };
 
           case "recon_complete":
             return { ...prev, contextBrief: event.brief };

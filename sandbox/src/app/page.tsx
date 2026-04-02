@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCouncilSocket } from "@/hooks/useCouncilSocket";
 import { MeetingRoom } from "@/components/MeetingRoom";
 import { SpeechPanel } from "@/components/SpeechPanel";
@@ -11,7 +12,21 @@ export default function Home() {
   const council = useCouncilSocket();
 
   return (
-    <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column", position: "relative" }}>
+      <Link
+        href="/cursor"
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 12,
+          zIndex: 20,
+          fontSize: 12,
+          color: "#6cf",
+          textDecoration: "none",
+        }}
+      >
+        Mini Cursor demo →
+      </Link>
       {/* Status bar */}
       <PhaseBar
         phase={council.phase}
@@ -51,6 +66,7 @@ export default function Home() {
             positions={council.positions}
             rebuttals={council.rebuttals}
             searchQueries={council.searchQueries}
+            reconResults={council.reconResults}
             contextBrief={council.contextBrief}
             finalPlan={council.finalPlan}
           />

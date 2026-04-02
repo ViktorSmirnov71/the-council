@@ -35,33 +35,110 @@ async function runMockDeliberation(state: CouncilState) {
   });
   await sleep(MOCK_DELAY);
 
-  state.broadcast({
-    event: "recon_start",
-    searches: [
-      "cursor code editor architecture",
-      "building AI code editor from scratch",
-      "tree-sitter vs LSP for code intelligence",
-      "electron vs tauri for desktop apps 2025",
-    ],
-  });
-  await sleep(MOCK_DELAY);
+  const searchQueries = [
+    "cursor code editor architecture",
+    "building AI code editor from scratch",
+    "tree-sitter vs LSP for code intelligence",
+    "electron vs tauri desktop apps benchmark",
+    "codemirror 6 vs monaco editor comparison",
+  ];
 
-  const contextBrief = `[cursor code editor architecture]
-• Cursor is built on Electron with a forked VS Code base, using Tree-sitter for parsing and LSP for language intelligence.
-• The AI layer handles inline completions, chat, and codebase-wide context retrieval via embeddings.
+  state.broadcast({ event: "recon_start", searches: searchQueries });
+  await sleep(600);
 
-[building AI code editor from scratch]
-• Modern code editors typically layer: shell (Electron/Tauri) → editor (Monaco/CodeMirror) → intelligence (LSP) → AI (completion/chat).
-• CodeMirror 6 has better extension architecture than Monaco for custom integrations.
+  // Stream individual results with delays — feels like live research
+  const reconResults: Array<{ query: string; source: string; icon: string; snippet: string; meta?: string }> = [
+    {
+      query: searchQueries[0],
+      source: "github",
+      icon: "📦",
+      snippet: "getcursor/cursor — Fork of VS Code with AI-first architecture. Electron shell, Monaco editor, custom AI completion layer.",
+      meta: "★ 48.2k",
+    },
+    {
+      query: searchQueries[0],
+      source: "web",
+      icon: "🔍",
+      snippet: "Cursor uses a modified VS Code core with proprietary AI middleware. The completion engine intercepts editor events and streams tokens via a custom protocol.",
+    },
+    {
+      query: searchQueries[1],
+      source: "stackoverflow",
+      icon: "💬",
+      snippet: "Building a code editor from scratch: start with a text buffer (rope/piece table), add syntax highlighting via Tree-sitter, then LSP for intelligence. Don't build the parser yourself.",
+      meta: "142 upvotes",
+    },
+    {
+      query: searchQueries[1],
+      source: "docs",
+      icon: "📄",
+      snippet: "CodeMirror 6 architecture: EditorState (immutable) + EditorView (DOM). Extensions compose via facets. Better plugin API than Monaco for deep integrations.",
+    },
+    {
+      query: searchQueries[2],
+      source: "github",
+      icon: "📦",
+      snippet: "tree-sitter/tree-sitter — Incremental parsing system. WASM bindings available (web-tree-sitter). Parse times: <1ms for incremental edits on 10k LOC files.",
+      meta: "★ 18.9k",
+    },
+    {
+      query: searchQueries[2],
+      source: "benchmark",
+      icon: "📊",
+      snippet: "Tree-sitter vs LSP: Tree-sitter is 10-100x faster for syntax queries but LSP provides semantic intelligence (type checking, go-to-def). Use both — they complement.",
+      meta: "bench: 0.3ms vs 45ms",
+    },
+    {
+      query: searchQueries[3],
+      source: "npm",
+      icon: "📦",
+      snippet: "@anthropic-ai/sdk — Official Anthropic TypeScript SDK. Streaming completions, tool use, message batching. 2.1M weekly downloads.",
+      meta: "v0.39.0",
+    },
+    {
+      query: searchQueries[3],
+      source: "web",
+      icon: "🔍",
+      snippet: "Tauri v2 produces 3-8MB binaries vs Electron's 150MB+. Uses system WebView instead of bundling Chromium. Rust backend with JS/TS frontend.",
+    },
+    {
+      query: searchQueries[4],
+      source: "benchmark",
+      icon: "📊",
+      snippet: "CodeMirror 6 vs Monaco: CM6 loads 2.3x faster, uses 40% less memory. Monaco has richer out-of-box TypeScript support. CM6 wins for custom editors.",
+      meta: "2026 benchmark",
+    },
+    {
+      query: searchQueries[4],
+      source: "github",
+      icon: "📦",
+      snippet: "anthropics/claude-code — Reference implementation of AI coding agent. MCP tools, streaming, subagents. Architecture patterns for AI-editor integration.",
+      meta: "★ 31.5k",
+    },
+    {
+      query: searchQueries[0],
+      source: "arxiv",
+      icon: "📑",
+      snippet: "\"Retrieval-Augmented Code Generation\" (2025) — Embedding-based codebase indexing improves completion accuracy by 34% over context-window-only approaches.",
+      meta: "cited 89x",
+    },
+    {
+      query: searchQueries[1],
+      source: "github",
+      icon: "📦",
+      snippet: "nicedoc/continue — Open-source AI code assistant. VS Code + JetBrains. Architecture: provider layer → context engine → completion → chat. Good reference.",
+      meta: "★ 22.1k",
+    },
+  ];
 
-[tree-sitter vs LSP]
-• Tree-sitter provides fast incremental parsing for syntax highlighting and structural queries. LSP provides semantic intelligence (go-to-def, completions).
-• They complement each other — Tree-sitter for speed, LSP for depth.
+  for (const result of reconResults) {
+    state.broadcast({ event: "recon_result", ...result });
+    await sleep(350 + Math.random() * 250); // Staggered timing — feels real
+  }
 
-[electron vs tauri]
-• Tauri produces ~10x smaller binaries than Electron and uses less memory, but has a smaller ecosystem.
-• Electron has mature tooling and the entire VS Code extension ecosystem.`;
+  await sleep(500);
 
+  const contextBrief = "12 sources gathered across GitHub, npm, benchmarks, docs, StackOverflow, and arxiv. Key signals: fork VS Code vs build on CM6, Tree-sitter + LSP together, Tauri for binary size, embedding-based indexing for AI context.";
   state.broadcast({ event: "recon_complete", brief: contextBrief });
   await sleep(MOCK_DELAY);
 
