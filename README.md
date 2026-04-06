@@ -6,7 +6,7 @@
 >
 > One prompt. Four crewmates. One plan survives.
 
-**2nd Place** at [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | Track C: Agent Runtime Tools | Bounty #08
+**Finalist — 2nd Place** at [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | Track C: Agent Runtime Tools | Bounty #08
 
 Built by [Viktor Smirnov](https://github.com/ViktorSmirnov71) & [Rex Heng](https://github.com/rexheng) — 2 people, 5 hours
 
@@ -254,7 +254,7 @@ the-council/
 ## Hackathon
 
 - **Event**: [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/)
-- **Result**: **2nd Place**
+- **Result**: **Finalist — 2nd Place**
 - **Track**: C — Agent Runtime Tools
 - **Bounty**: #08 — "Make agents justify their decisions before they act"
 - **Team**: [Viktor Smirnov](https://github.com/ViktorSmirnov71) & [Rex Heng](https://github.com/rexheng) — 2 people, 5 hours
