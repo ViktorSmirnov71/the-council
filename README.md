@@ -1,10 +1,10 @@
-# The Council
+# Amogus — The Council
 
-**A decision layer for AI agents — structured multi-perspective deliberation via MCP.**
+**A structured deliberation layer for AI agents via the Model Context Protocol (MCP).**
 
 > _"Build me Cursor, make no mistakes."_
 >
-> One prompt. Four crewmates. One plan survives.
+> One prompt. Four isolated archetypes. One battle-tested plan survives.
 
 **Finalist — 2nd Place** at [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | Track C: Agent Runtime Tools | Bounty #08
 
@@ -167,31 +167,31 @@ The entire deliberation is visualized in real-time as an Among Us emergency meet
 
 The sandbox is served directly by the MCP server — no separate process needed. Browser opens automatically on first `council_plan` call.
 
-## MCP Interface
+## MCP Tool Interface
 
-```
-council_plan        Submit a prompt for full council deliberation
-council_members     View current roster, stats, and lineage
-council_history     Past decisions with vote breakdowns
-council_override    Human corrects a verdict (feeds reaper scoring)
-council_sandbox     Open the live visualization
-```
+Five tools exposed over the Model Context Protocol. Compatible with any MCP client: Cursor, Claude Code, Windsurf, or custom agent runtimes.
 
-Any MCP client (Cursor, Claude Code, etc.) can call these tools. The council is editor-agnostic.
+| Tool | Description | Returns |
+|------|-------------|---------|
+| `council_plan` | Full deliberation pipeline: recon, isolation rounds, weighted verdict, synthesis | Executable PRD with attributions, confidence scores, and dissenting opinions |
+| `council_members` | Current roster with archetypes, win/loss records, and evolutionary lineage | Member stats, generation numbers, trait inheritance chains |
+| `council_history` | Audit trail of past decisions | Prompts, vote breakdowns, override history |
+| `council_override` | Human feedback loop. Corrects a past verdict, updates member scoring | Confirmation + reaper score adjustments |
+| `council_sandbox` | Opens the Among Us visualization in-browser | WebSocket URL for real-time event stream |
 
 ## Install
 
 **One command:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ViktorSmirnov71/the-council/main/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ViktorSmirnov71/amogus/main/setup.sh | bash
 ```
 
 **Or manually:**
 
 ```bash
-git clone https://github.com/ViktorSmirnov71/the-council.git
-cd the-council
+git clone https://github.com/ViktorSmirnov71/amogus.git
+cd amogus
 cd mcp-server && npm install && cd ..
 echo "ANTHROPIC_API_KEY=sk-ant-your-key" > .env
 cp .cursor/mcp.json.example .cursor/mcp.json  # edit with your key + path
@@ -203,27 +203,30 @@ Then open the folder in **Cursor** or **Claude Code** and ask:
 
 ## Tech Stack
 
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| MCP Server | Node.js / TypeScript | MCP SDK runs on Node, stdio transport |
-| Deliberation | Anthropic Claude API | Parallel calls per member, structured JSON output |
-| Sandbox UI | Next.js (static export) | Served directly by MCP server, no separate process |
-| Rendering | HTML5 Canvas | One room scene, no framework overhead |
-| Real-time | WebSocket | Server pushes events as deliberation progresses |
-| Port management | Auto-probe | Finds open port, never crashes on EADDRINUSE |
+| Layer | Technology | Architecture Decision |
+|-------|-----------|----------------------|
+| Protocol | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) | Stdio transport, editor-agnostic. Any MCP client gets deliberation as a tool call |
+| Runtime | Node.js / TypeScript | Native async/await for parallel LLM orchestration, strict typing across the deliberation pipeline |
+| LLM Backend | Anthropic Claude API | 4 concurrent inference calls per round via `Promise.allSettled`, structured JSON schema enforcement |
+| Context Gathering | Claude web search tool | Real-time retrieval across GitHub, npm, arXiv, benchmarks. No vector DB, no embeddings |
+| Visualization | Next.js 15 (static export) + HTML5 Canvas | Zero-dependency rendering. Served as static assets from the MCP server's HTTP layer |
+| Real-time Events | WebSocket | Typed event stream (18 event types) pushed to connected clients as deliberation progresses |
+| Port Management | Auto-probe with recursive fallback | Finds open port dynamically. Prevents EADDRINUSE crashes in multi-session environments |
+| Security | Path traversal protection | Sandboxed static file serving with resolved path validation |
 
 ## Project Structure
 
 ```
-the-council/
+amogus/
 ├── mcp-server/src/
-│   ├── index.ts         # MCP entry — 5 tools, stdout protection, env loading
-│   ├── council.ts       # Deliberation engine — recon → rounds → verdict → synthesis
-│   ├── members.ts       # 4 archetypes with forced evaluation frameworks
-│   ├── reaper.ts        # Evolution — score, execute, mutate, spawn
-│   ├── recon.ts         # Context gathering via web search
-│   ├── synthesis.ts     # Neutral clerk — compiles critiques into plan
-│   └── state.ts         # HTTP server + WebSocket + port management
+│   ├── index.ts         # MCP entry point — stdio transport, JSON-RPC stdout isolation
+│   ├── council.ts       # Deliberation orchestrator — parallel LLM pipeline
+│   ├── members.ts       # Archetype definitions + forced evaluation framework prompts
+│   ├── reaper.ts        # Evolutionary scoring — execution, mutation, lineage tracking
+│   ├── recon.ts         # Context retrieval via Claude web search tool
+│   ├── synthesis.ts     # Neutral synthesis clerk — critique aggregation + PRD generation
+│   ├── state.ts         # HTTP/WebSocket server — auto-port, path traversal protection
+│   └── types.ts         # Shared TypeScript type definitions
 │
 ├── sandbox/src/
 │   ├── components/

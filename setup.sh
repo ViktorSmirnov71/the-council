@@ -1,12 +1,12 @@
 #!/bin/bash
-# The Council — One-command setup
-# Usage: curl -fsSL https://raw.githubusercontent.com/ViktorSmirnov71/the-council/main/setup.sh | bash
+# Amogus — One-command setup
+# Usage: curl -fsSL https://raw.githubusercontent.com/ViktorSmirnov71/amogus/main/setup.sh | bash
 
 set -e
 
 echo ""
 echo "  ╔══════════════════════════════════════╗"
-echo "  ║         THE COUNCIL — Setup          ║"
+echo "  ║           AMOGUS — Setup             ║"
 echo "  ╚══════════════════════════════════════╝"
 echo ""
 
@@ -29,11 +29,11 @@ fi
 
 # Clone if not already in the repo
 if [ ! -f "mcp-server/package.json" ]; then
-  echo "  Cloning the-council..."
-  git clone --depth 1 https://github.com/ViktorSmirnov71/the-council.git
-  cd the-council
+  echo "  Cloning amogus..."
+  git clone --depth 1 https://github.com/ViktorSmirnov71/amogus.git
+  cd amogus
 else
-  echo "  Already in the-council repo"
+  echo "  Already in amogus repo"
 fi
 
 # Install dependencies
@@ -52,7 +52,7 @@ mkdir -p .cursor
 cat > .cursor/mcp.json << EOF
 {
   "mcpServers": {
-    "the-council": {
+    "amogus": {
       "command": "npx",
       "args": ["tsx", "mcp-server/src/index.ts"],
       "cwd": "$REPO_DIR",
@@ -69,7 +69,7 @@ echo "  Created .cursor/mcp.json"
 cat > .mcp.json << EOF
 {
   "mcpServers": {
-    "the-council": {
+    "amogus": {
       "command": "npx",
       "args": ["tsx", "mcp-server/src/index.ts"],
       "cwd": "$REPO_DIR",

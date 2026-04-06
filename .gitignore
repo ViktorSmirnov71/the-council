@@ -6,3 +6,6 @@ dist/
 .cursor/mcp.json
 .mcp.json
 mcp-server/sandbox-ui/
+.DS_Store
+*.log
+linkedin-draft.html

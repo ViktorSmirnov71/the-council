@@ -1,11 +1,11 @@
 {
-  "name": "the-council-mcp",
+  "name": "amogus-mcp",
   "version": "0.1.0",
   "description": "Among Us-themed AI agent council for structured multi-perspective planning — MCP server",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "the-council-mcp": "dist/index.js"
+    "amogus-mcp": "dist/index.js"
   },
   "files": [
     "dist",
@@ -33,7 +33,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ViktorSmirnov71/the-council"
+    "url": "https://github.com/ViktorSmirnov71/amogus"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

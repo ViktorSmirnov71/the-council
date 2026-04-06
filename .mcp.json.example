@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "the-council": {
+    "amogus": {
       "command": "npx",
       "args": ["tsx", "mcp-server/src/index.ts"],
-      "cwd": "/Users/viktorsmirnov/the-council",
+      "cwd": "/YOUR/PATH/TO/amogus",
       "env": {
         "ANTHROPIC_API_KEY": "sk-ant-your-key-here"
       }

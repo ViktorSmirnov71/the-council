@@ -2,7 +2,7 @@
 
 ## System Overview
 
-The Council is an MCP server that any coding agent (Cursor, Claude Code, etc.) can invoke to get structured multi-perspective planning. It exposes tools over the Model Context Protocol and streams deliberation events to a web-based sandbox UI via WebSocket.
+Amogus is an MCP server that any coding agent (Cursor, Claude Code, Windsurf, or custom agent runtimes) can invoke to get structured multi-perspective planning. It exposes tools over the Model Context Protocol (MCP) via stdio transport and streams deliberation events to a web-based sandbox UI via WebSocket.
 
 ```
 ┌─────────────────────────┐
@@ -116,14 +116,8 @@ Appears above crewmate during rounds. Streams text in real-time (character by ch
 ### `VoteBar.tsx`
 Horizontal bars for each option. Fill animation on vote. Shows which crewmate voted for what. Among Us vote screen style.
 
-### `Gallows.tsx`
-Bottom-left panel. Rope + platform. When reaper fires: character slides in, rope drops, fade to skull, ejection text ("GHOST-v1 was eliminated. Win rate: .200").
-
 ### `Leaderboard.tsx`
 Bottom-right panel. Ranked list of members with W-L records and streaks. Dead members shown greyed with skull icon and lineage info.
-
-### `ReaperAnimation.tsx`
-Full-screen overlay. Red flash, "REAPER ACTIVATED" text, spotlight on lowest performer, drag animation to gallows.
 
 ## WebSocket Event Contract
 

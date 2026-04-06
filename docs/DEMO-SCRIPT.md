@@ -1,7 +1,7 @@
 # Demo Script — 4 Minutes
 
 ## Setup
-- Terminal: Cursor or Claude Code session with The Council MCP connected
+- Terminal: Cursor or Claude Code session with Amogus MCP connected
 - Browser: Sandbox UI open on second screen / split view
 - Prompt pre-loaded: `"build me Cursor, make no mistakes"`
 
@@ -27,7 +27,7 @@ Show the output — a naive 5-step plan:
 
 ## 0:30–1:00 — THE COUNCIL ACTIVATES
 
-**[Terminal]** Now run the same prompt through The Council MCP tool.
+**[Terminal]** Now run the same prompt through Amogus MCP tool.
 
 **[Sandbox UI]** Emergency meeting alarm fires. Screen goes red. "EMERGENCY MEETING" slams in.
 

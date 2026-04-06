@@ -44,7 +44,7 @@ const state = new CouncilState();
 await state.startServer(3099);
 
 const server = new McpServer({
-  name: "the-council",
+  name: "amogus",
   version: "0.1.0",
 });
 
