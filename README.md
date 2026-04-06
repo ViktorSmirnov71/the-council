@@ -6,7 +6,9 @@
 >
 > One prompt. Four crewmates. One plan survives.
 
-Built for [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | **Track C: Agent Runtime Tools** | **Bounty #08**
+**2nd Place** at [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/) | Track C: Agent Runtime Tools | Bounty #08
+
+Built by [Viktor Smirnov](https://github.com/ViktorSmirnov71) & [Rex Heng](https://github.com/rexheng) — 2 people, 5 hours
 
 ![The Council — Isolation Round](docs/screenshots/round1-full.png)
 
@@ -228,7 +230,6 @@ the-council/
 │   │   ├── MeetingRoom.tsx   # Canvas renderer — map, crewmates, animations
 │   │   ├── SpeechPanel.tsx   # Right sidebar — critiques, rebuttals, plan
 │   │   ├── VotePanel.tsx     # Vote bars with member dots
-│   │   ├── Gallows.tsx       # Execution display
 │   │   ├── Leaderboard.tsx   # Member rankings
 │   │   └── PhaseBar.tsx      # Phase progress indicator
 │   └── hooks/
@@ -253,10 +254,11 @@ the-council/
 ## Hackathon
 
 - **Event**: [Cursor Hack London 2026](https://cursorhacklondon2026.vercel.app/)
+- **Result**: **2nd Place**
 - **Track**: C — Agent Runtime Tools
 - **Bounty**: #08 — "Make agents justify their decisions before they act"
-- **Team**: 2 people, 5 hours
+- **Team**: [Viktor Smirnov](https://github.com/ViktorSmirnov71) & [Rex Heng](https://github.com/rexheng) — 2 people, 5 hours
 
 ## License
 
-MIT
+[MIT](LICENSE)

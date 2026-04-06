@@ -1,6 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
-import { join, extname } from "node:path";
+import { readFileSync, existsSync, realpathSync } from "node:fs";
+import { join, extname, resolve } from "node:path";
 import { exec } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import type { CouncilPhase, MemberState, DecisionRecord, SandboxEvent } from "./types.js";
@@ -77,6 +77,15 @@ export class CouncilState {
 
       let filePath = join(sandboxDir, req.url === "/" ? "index.html" : req.url!);
 
+      // Path traversal protection: ensure resolved path stays within sandbox
+      const realSandbox = realpathSync(sandboxDir);
+      const resolved = resolve(filePath);
+      if (!resolved.startsWith(realSandbox)) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+
       if (!extname(filePath) && !existsSync(filePath)) {
         filePath += ".html";
       }
@@ -143,7 +152,7 @@ export class CouncilState {
       process.platform === "darwin"
         ? `open "${this.sandboxUrl}"`
         : process.platform === "win32"
-          ? `start "${this.sandboxUrl}"`
+          ? `start "" "${this.sandboxUrl}"`
           : `xdg-open "${this.sandboxUrl}"`;
 
     exec(cmd, (err) => {
@@ -173,10 +182,6 @@ export class CouncilState {
     this.broadcast({ event: "phase_change", phase });
   }
 
-  getMember(id: string): MemberState | undefined {
-    return this.members.find((m) => m.id === id);
-  }
-
   replaceMember(deadId: string, newMember: MemberState): void {
     const idx = this.members.findIndex((m) => m.id === deadId);
     if (idx !== -1) {
@@ -193,7 +198,4 @@ export class CouncilState {
     return `decision-${String(this.decisionCounter + 1).padStart(3, "0")}`;
   }
 
-  shutdown(): void {
-    this.wss?.close();
-  }
 }

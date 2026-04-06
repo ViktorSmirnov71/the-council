@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { CouncilState } from "./state.js";
+import { deliberate } from "./council.js";
+
 // CRITICAL: MCP uses stdout for JSON-RPC. Any stray stdout output kills the protocol.
 // Some Node/shell hooks print to stdout on startup (e.g. "◇ injecting env").
 // Intercept and redirect ALL stdout writes to stderr until MCP transport takes over.
@@ -15,9 +23,6 @@ process.stdout.write = function (chunk: any, ...args: any[]) {
   return _origStdoutWrite(chunk, ...args);
 } as typeof process.stdout.write;
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 // Load .env silently
 function loadEnvSilent(path: string) {
   try {
@@ -32,12 +37,6 @@ function loadEnvSilent(path: string) {
 }
 loadEnvSilent(join(import.meta.dirname, "../../.env"));
 loadEnvSilent(join(import.meta.dirname, "../.env"));
-
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { CouncilState } from "./state.js";
-import { deliberate } from "./council.js";
 
 const state = new CouncilState();
 

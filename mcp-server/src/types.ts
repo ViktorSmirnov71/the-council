@@ -43,7 +43,6 @@ export type CouncilPhase =
 export interface CouncilRequest {
   prompt: string;
   context?: string;
-  options?: string[];
 }
 
 export interface FrameworkAnswers {
